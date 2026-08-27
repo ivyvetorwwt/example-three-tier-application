@@ -1,5 +1,7 @@
 # Contributing to example-three-tier-application
 
+> For project overview and deployment information, see the [README](README.md).
+
 Thank you for your interest in contributing! This guide will help you get started with local development.
 
 ## Prerequisites
@@ -162,40 +164,38 @@ example-three-tier-application/
 If port 3000 or 5432 is already in use:
 ```bash
 # Find and stop the process using the port
-lsof -ti:3000 | xargs kill -9
+lsof -ti:3000 | xargs kill -9  # macOS/Linux
 ```
 
-Or modify the port mapping in `docker-compose.yml`.
+Or change the port mapping in `docker-compose.yml`:
+```yaml
+ports:
+  - "3001:3000"  # Map to a different host port
+```
 
 ### Database connection issues
 
 If the API can't connect to the database:
+1. Ensure all containers are running: `docker compose ps`
+2. Check logs: `docker compose logs db`
+3. Restart the stack: `docker compose down && docker compose up`
+
+### Changes not reflecting
+
+If your code changes aren't showing up:
+1. Rebuild the containers: `docker compose up --build`
+2. Clear Docker cache: `docker compose build --no-cache`
+
+### Need a fresh start
+
+To completely reset your local environment:
 ```bash
-# Check if postgres is healthy
-docker compose ps
-
-# View postgres logs
-docker compose logs postgres
-
-# Restart the stack
 docker compose down -v
 docker compose up --build
 ```
 
-### Containers won't start
+This removes all containers, networks, and volumes (including database data).
 
-```bash
-# Clean up everything and start fresh
-docker compose down -v
-docker system prune -f
-docker compose up --build
-```
+## Questions?
 
-## Questions or Issues?
-
-If you encounter any problems or have questions:
-- Check the [README.md](README.md) for detailed documentation
-- Open an issue on GitHub
-- Review existing issues for similar problems
-
-Thank you for contributing! 🎉
+If you have questions or run into issues, feel free to open an issue on GitHub!
