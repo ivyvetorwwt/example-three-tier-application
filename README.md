@@ -24,6 +24,8 @@ The app is a simple task manager (to-do list) that demonstrates how the three ti
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose plugin)
 
+Ensure Docker is running before executing any compose commands.
+
 ### Start the stack
 
 ```bash
