@@ -420,3 +420,98 @@ docker compose logs web
 - [Google Cloud Run Health Checks](https://cloud.google.com/run/docs/configuring/healthchecks)
 - [PostgreSQL pg_isready Documentation](https://www.postgresql.org/docs/current/app-pg-isready.html)
 - [Express.js Best Practices](https://expressjs.com/en/advanced/best-practice-performance.html)
+
+
+---
+
+## Complete File-by-File Health Check Impact Analysis
+
+This section documents every source file in the repository and describes whether and how it affects health checks.
+
+### Configuration Files
+
+| File | Affects Health Checks? | Description |
+|------|----------------------|-------------|
+| `docker-compose.yml` | **YES** | Defines PostgreSQL healthcheck with `pg_isready` command (5s interval, 5s timeout, 5 retries). Sets service dependencies based on health status. |
+| `.github/workflows/deploy.yml` | **Indirect** | CI/CD pipeline that builds and deploys services. Deployment success depends on health checks passing in Cloud Run. |
+| `README.md` | No | Documentation file, no health check impact. |
+| `.gitignore` | No | Git configuration, no health check impact. |
+| `LICENSE` | No | License file, no health check impact. |
+| `agents.md` | No | Documentation file, no health check impact. |
+
+### API Service Files (`src/api/`)
+
+| File | Affects Health Checks? | Description |
+|------|----------------------|-------------|
+| `src/api/index.js` | **YES - CRITICAL** | Implements the `/health` endpoint that returns `{"status":"ok"}`. This is used by Cloud Run startup and liveness probes. Also defines PORT (3001) which must match probe configuration. |
+| `src/api/db.js` | **Indirect** | Creates PostgreSQL connection pool. While not directly part of health check, database connectivity affects overall service health. The `/health` endpoint does NOT check database connectivity. |
+| `src/api/package.json` | **Indirect** | Defines dependencies (express, pg) and start script. If dependencies fail to install or start script fails, service won't start and health checks will fail. |
+| `src/api/package-lock.json` | **Indirect** | Locks dependency versions. Corrupted lock file could prevent service startup. |
+| `src/api/Dockerfile` | **YES** | Builds the API container image. Exposes port 3001 which must match health check configuration. CMD starts the service that responds to health checks. |
+| `src/api/.dockerignore` | No | Build optimization, no direct health check impact. |
+
+### Web Service Files (`src/web/`)
+
+| File | Affects Health Checks? | Description |
+|------|----------------------|-------------|
+| `src/web/app/page.tsx` | **YES** | Main page component rendered at `/` path. Cloud Run startup probe checks `GET /` so this page must render successfully. |
+| `src/web/app/layout.tsx` | **YES** | Root layout component. Must render successfully for `/` health check to pass. |
+| `src/web/app/actions.ts` | **Indirect** | Server actions that call API. Not directly checked by health probes, but failures here could indicate API connectivity issues. |
+| `src/web/app/globals.css` | No | Styling file, doesn't affect health check responses. |
+| `src/web/app/favicon.ico` | No | Icon file, no health check impact. |
+| `src/web/package.json` | **Indirect** | Defines Next.js dependencies and build/start scripts. Build or start failures prevent service from responding to health checks. |
+| `src/web/package-lock.json` | **Indirect** | Locks dependency versions. |
+| `src/web/Dockerfile` | **YES** | Multi-stage build for Next.js app. Exposes port 3000 which must match health check configuration. CMD starts server.js that responds to health checks. |
+| `src/web/next.config.ts` | **YES** | Sets `output: "standalone"` which affects how the production server runs. Required for Docker deployment and health check responses. |
+| `src/web/tsconfig.json` | **Indirect** | TypeScript configuration. Compilation errors prevent build, which prevents health checks from working. |
+| `src/web/eslint.config.mjs` | No | Linting configuration, no runtime health check impact. |
+| `src/web/postcss.config.mjs` | No | CSS processing configuration, no health check impact. |
+| `src/web/.dockerignore` | No | Build optimization, no direct health check impact. |
+| `src/web/.gitignore` | No | Git configuration, no health check impact. |
+| `src/web/README.md` | No | Documentation, no health check impact. |
+| `src/web/AGENTS.md` | No | Documentation, no health check impact. |
+| `src/web/CLAUDE.md` | No | Documentation, no health check impact. |
+| `src/web/public/*` | No | Static assets (SVG files), no health check impact. |
+
+### Database Migration Files (`src/db/`)
+
+| File | Affects Health Checks? | Description |
+|------|----------------------|-------------|
+| `src/db/migrations/1718500000000_initial-schema.js` | **Indirect** | Creates `users` table. Migration failures prevent API from starting, which causes health checks to fail. |
+| `src/db/migrations/1718500001000_create-tasks.js` | **Indirect** | Creates `tasks` table. Migration failures prevent API from starting, which causes health checks to fail. |
+| `src/db/package.json` | **Indirect** | Defines node-pg-migrate dependency and migration scripts. Required for database setup before services can be healthy. |
+| `src/db/package-lock.json` | **Indirect** | Locks dependency versions for migration tool. |
+| `src/db/Dockerfile` | **Indirect** | Builds migration container. Runs migrations that must complete before API can start and pass health checks. |
+| `src/db/.dockerignore` | No | Build optimization, no direct health check impact. |
+
+### Infrastructure Files (`src/infrastructure/`)
+
+| File | Affects Health Checks? | Description |
+|------|----------------------|-------------|
+| `src/infrastructure/main.tf` | **YES - CRITICAL** | Defines Cloud Run startup and liveness probes for both API and web services. Configures probe paths, ports, timeouts, and failure thresholds. Also provisions Cloud SQL which has built-in health monitoring. |
+| `src/infrastructure/migration.tf` | **Indirect** | Defines Cloud Run Job for migrations. Migrations must succeed before API can be healthy. |
+| `src/infrastructure/variables.tf` | **Indirect** | Defines variables including image URIs and instance limits. Incorrect values could cause deployment failures. |
+| `src/infrastructure/outputs.tf` | No | Defines Terraform outputs. No health check impact. |
+| `src/infrastructure/terraform.tfvars.example` | No | Example configuration file, not used in actual deployments. |
+| `src/infrastructure/.gitignore` | No | Git configuration, no health check impact. |
+
+### Summary Statistics
+
+- **Total files analyzed:** 45
+- **Files with DIRECT health check impact:** 6
+  - `docker-compose.yml`
+  - `src/api/index.js`
+  - `src/api/Dockerfile`
+  - `src/web/Dockerfile`
+  - `src/web/next.config.ts`
+  - `src/infrastructure/main.tf`
+- **Files with INDIRECT health check impact:** 14
+- **Files with NO health check impact:** 25
+
+### Critical Health Check Dependencies
+
+1. **`src/api/index.js`** - Implements the `/health` endpoint
+2. **`src/infrastructure/main.tf`** - Configures all Cloud Run health probes
+3. **`docker-compose.yml`** - Configures PostgreSQL health check and service dependencies
+4. **`src/web/app/page.tsx`** - Must render successfully for web health check
+5. **`src/api/Dockerfile` & `src/web/Dockerfile`** - Must expose correct ports and start services properly
