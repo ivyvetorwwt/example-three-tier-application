@@ -1,3 +1,4 @@
+// API server entry point for the three-tier application
 const express = require('express');
 const db = require('./db');
 
