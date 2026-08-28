@@ -129,4 +129,11 @@ DATABASE_URL=postgres://app:app@localhost:5432/app npx node-pg-migrate up
 DATABASE_URL=postgres://app:app@localhost:5432/app npx node-pg-migrate down
 ```
 
-When running via Docker Compose the `migrate` service handles this automatically on startup.
+When running via Docker Compose the `migrate` service handles this automatically.
+
+## License
+
+MIT
+
+progress panel test
+progress panel test 2
